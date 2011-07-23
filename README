@@ -1,0 +1,4 @@
+clavim (latin acc. for "key")
+
+clavim is (going to be) a better C, C++, and Obj-C syntax highlighter for vim
+based on libclang from the Clang project in the LLVM tree
