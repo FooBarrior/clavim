@@ -27,10 +27,12 @@ global cursors
 if update == True:
     vim.command("syn clear clavimMember")
 
-cursors = []
 cursors = find_cursors(get_current_translation_unit(update), clang.cindex.CursorKind.MEMBER_REF_EXPR)
+keys = 'line start end'.split()
 for x in cursors:
-    vim.command("syn match clavimMember /\\%"+str(x['line'])+"l\\%"+str(x['start'])+"c.*\\%"+str(x['end'])+"c/")
+    t = tuple(str(x[k]) for k in keys)
+    if x['file'] == vim.current.buffer.name:
+        vim.command(r"syn match clavimMember /\%%%sl\%%%sc.*\%%%sc/" % t)
 
 if update == False:
     update = True

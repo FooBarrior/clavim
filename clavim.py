@@ -15,7 +15,7 @@ import vim
 
 def clavim_init():
     global index
-    index = Index.create()
+    index = clang.cindex.Index.create()
     global translationUnits
     translationUnits = dict()
     global update
@@ -48,8 +48,10 @@ def cursorvisit_callback(node, parent, userdata):
     if node.kind == userdata['kind']:
         if node.extent.start.file is None:
             return 2
+        lib = clang.cindex.conf.lib
+
         my_node = dict()
-        my_node['name'] = clang.cindex.Cursor_displayname(node)
+        my_node['name'] = lib.clang_getCursorDisplayName(node)
         my_node['kind'] = node.kind.name
         my_node['file'] = node.extent.start.file.name
         my_node['line'] = node.location.line
@@ -67,9 +69,9 @@ def find_cursors(tu, kind):
     userdata['kind'] = kind
 
     # visit children
-    clang.cindex.Cursor_visit(
+    clang.cindex.conf.lib.clang_visitChildren(
         tu.cursor,
-        clang.cindex.Cursor_visit_callback(cursorvisit_callback),
+        clang.cindex.callbacks['cursor_visit'](cursorvisit_callback),
         userdata)
 
     return nodes
