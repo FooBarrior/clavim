@@ -6,9 +6,6 @@ hi clavimMember  ctermbg=Cyan     ctermfg=Black  guibg=#8CCBEA    guifg=Black
 hi clavimError   ctermbg=Red      ctermfg=Black  guibg=Red        guifg=Black
 
 function! s:ClavimInit()
-    python import sys
-    python sys.argv[0] = ''
-    exe 'python sys.path = ["' . s:plugin_path . '"] + sys.path'
     exe 'pyfile ' . s:plugin_path . '/clavim.py'
     set ut=100 " the time in milliseconds after a keystroke when you want to reparse the AST
     python clavim_init()
@@ -18,29 +15,10 @@ function! s:ClavimInit()
 endfunction
 
 function! s:ClavimHighlightMemberExpressions()
-python << endpython
-global update
-global cursors
-
-if update:
-    vim.command("syn clear clavimMember")
-
-cursors = find_cursors(get_current_translation_unit(update), clang.cindex.CursorKind.MEMBER_REF_EXPR)
-keys = 'line start end'.split()
-for x in cursors:
-    t = tuple(str(x[k]) for k in keys)
-    if x['file'] == vim.current.buffer.name:
-        vim.command(r"syn match clavimMember /\%%%sl\%%%sc.*\%%%sc/" % t)
-
-update = True
-
-endpython
-
+    call <SID>ClavimClearHighlights()
+    python highlight_expressions()
 endfunction
 
 function! s:ClavimClearHighlights()
-python << endpython
-    global cursors
-    vim.command("syn clear clavimMember")
-endpython
+    syn clear clavimMember
 endfunction

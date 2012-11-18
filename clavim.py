@@ -13,25 +13,24 @@ import sys
 import clang.cindex
 import vim
 
+
 def clavim_init():
+    sys.argv[0] = ''
+    sys.path.append(vim.eval('s:plugin_path'))
     global index
     index = clang.cindex.Index.create()
     global translationUnits
-    translationUnits = dict()
-    global update
-    update = False
+    translationUnits = {}
 
 def get_current_file():
     file = "\n".join(vim.eval("getline(1, '$')"))
     return (vim.current.buffer.name, file)
 
-def get_current_translation_unit(update = False):
-    current_file = get_current_file()
+def get_current_translation_unit(current_file):
     filename = vim.current.buffer.name
     if filename in translationUnits:
         tu = translationUnits[filename]
-        if update:
-            tu.reparse([current_file])
+        tu.reparse([current_file])
         return tu
 
     tu = index.parse(filename)
@@ -41,40 +40,57 @@ def get_current_translation_unit(update = False):
         return None
 
     translationUnits[filename] = tu
-    tu.reparse([current_file])
     return tu
 
-def cursorvisit_callback(node, parent, userdata):
-    if node.kind == userdata['kind']:
-        if node.extent.start.file is None:
-            return 2
-        lib = clang.cindex.conf.lib
+def cursorvisit_callback(node, parent, data):
+    f = node.extent.start.file
+    lib = clang.cindex.conf.lib
+    if node.kind != data['kind']:
+        return 2
+    if f is None:
+        return 2
 
-        my_node = dict()
-        my_node['name'] = lib.clang_getCursorDisplayName(node)
-        my_node['kind'] = node.kind.name
-        my_node['file'] = node.extent.start.file.name
-        my_node['line'] = node.location.line
-        my_node['start'] = node.extent.start.column
-        my_node['end'] = node.extent.end.column
-        userdata['nodes'].append(my_node)
+    converted_node = {
+        'name': lib.clang_getCursorDisplayName(node),
+        'kind': node.kind.name,
+        'file': f.name,
+        'line': node.location.line,
+        'start': node.extent.start.column,
+        'end': node.extent.end.column,
+    }
+    data['nodes'].append(converted_node)
     return 2
 
 
 def find_cursors(tu, kind):
-    nodes = []
-    userdata = dict()
-            
-    userdata['nodes'] = nodes
-    userdata['kind'] = kind
+    callback_data = {
+        'nodes': [],
+        'kind': kind,
+    }
 
     # visit children
     clang.cindex.conf.lib.clang_visitChildren(
         tu.cursor,
         clang.cindex.callbacks['cursor_visit'](cursorvisit_callback),
-        userdata)
+        callback_data
+    )
 
-    return nodes
+    return callback_data['nodes']
+
+def highlight_expressions():
+    global cursors
+    # find all clang cursors
+    tu = get_current_translation_unit(get_current_file)
+    MEMBER_REF_EXPR = clang.cindex.CursorKind.MEMBER_REF_EXPR
+    cursors = find_cursors(tu, MEMBER_REF_EXPR)
+
+    keys = 'line start end'.split()
+    syn_match = r"syn match clavimMember /\%%%sl\%%%sc.*\%%%sc/"
+    for x in cursors:
+        if x['file'] == vim.current.buffer.name:
+            t = tuple(str(x[k]) for k in keys)
+            vim.command(syn_match % t)
+
 
 def main():
     index = clang.cindex.Index.create()
@@ -84,11 +100,8 @@ def main():
     nodes = find_cursors(tu, kind)
 
     print 'nodes (%s):' % (len(nodes))
+    keys = 'name kind file line start end'.split()
+    template = ' '.join(['%1s = %%(%1s)s' % k for k in keys])
     for x in nodes:
-        print 'name=%s kind=%s file=%s line=%s start=%s end=%s' % (
-            x['name'], 
-            x['kind'], 
-            x['file'], 
-            x['line'], 
-            x['start'],
-            x['end'])
+        print template % x
+
